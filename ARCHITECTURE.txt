@@ -1,0 +1,166 @@
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   AI GAME COMPANION - SYSTEM ARCHITECTURE                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PLAYER INPUT                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Text Command: "follow me", "come with me", "stay close"           │   │
+│  │  Source: Voice-to-text (external) or UI input                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Natural Language
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INTENT COMPILER (LLM)                                    ⏱️  1000-2000ms   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • Gemini 2.5 Flash API                                             │   │
+│  │  • System Prompt: "You are an intent-to-JSON compiler..."          │   │
+│  │  • JSON Generation with Schema Guidance                            │   │
+│  │  • NO feasibility checking (only intent compilation)               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Structured JSON
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  JSON SCHEMA VALIDATOR                                    ⏱️  5-10ms        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • Validate against authoritative schema                           │   │
+│  │  • Check required fields & data types                              │   │
+│  │  • Retry on failure (up to 3 attempts)                             │   │
+│  │  • Return validation errors to LLM for correction                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Validated Command
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  UNREAL ENGINE EXECUTOR                                   ⏱️  50-100ms      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • Check game state (is companion already following?)              │   │
+│  │  • Validate action feasibility (navigation, obstacles)             │   │
+│  │  • Execute command (update AI behavior)                            │   │
+│  │  • Return response_id (RESP_FOLLOW_ACCEPT, etc.)                   │   │
+│  │  • SOLE AUTHORITY for success/failure decisions                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Response + response_id
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DIALOGUE RESOLVER                                        ⏱️  <1ms          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • Pure lookup: response_id → dialogue text                        │   │
+│  │  • RESP_FOLLOW_ACCEPT → "Alright, I'm right behind you."          │   │
+│  │  • RESP_ALREADY_FOLLOWING → "I'm already following you."          │   │
+│  │  • RESP_CANNOT_FOLLOW → "I can't follow you from here."           │   │
+│  │  • NO AI involvement - deterministic mapping                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Dialogue Text
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  OUTPUT TO PLAYER                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Dialogue: "Alright, I'm right behind you."                        │   │
+│  │  Display: UI widget, subtitle, audio (TTS)                         │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              DATA FLOW EXAMPLES                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  COMMAND JSON (LLM → UE)                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  {                                                                          │
+│    "command_id": "cmd_001",                                                 │
+│    "actions": [{                                                            │
+│      "action_id": "act_001",                                                │
+│      "type": "follow",                                                      │
+│      "target": {                                                            │
+│        "descriptors": ["player"],                                           │
+│        "category_hint": "player"                                            │
+│      },                                                                     │
+│      "parameters": {"distance_preference_m": 2.0},                          │
+│      "assigned_to": "companion_01",                                         │
+│      "priority": "normal",                                                  │
+│      "depends_on": null                                                     │
+│    }],                                                                      │
+│    "dialogue_context": "follow me",                                         │
+│    "requires_clarification": false                                          │
+│  }                                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  RESPONSE JSON (UE → System)                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  {                                                                          │
+│    "signal_type": "validation",                                             │
+│    "command_id": "cmd_001",                                                 │
+│    "actions": [{                                                            │
+│      "action_id": "act_001",                                                │
+│      "status": true,                                                        │
+│      "reason": null,                                                        │
+│      "companion_id": "companion_01",                                        │
+│      "response_id": "RESP_FOLLOW_ACCEPT"                                    │
+│    }]                                                                       │
+│  }                                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                            TIMING BREAKDOWN                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Component              Time (ms)    Percentage    Notes
+  ─────────────────────  ───────────  ────────────  ─────────────────────────
+  Intent Compiler        1000-2000    80-90%        Gemini API (bottleneck)
+  Schema Validator       5-10         <1%           Local validation
+  UE Executor            50-100       3-5%          Game logic
+  Dialogue Resolver      <1           <1%           Dictionary lookup
+  ─────────────────────  ───────────  ────────────  ─────────────────────────
+  TOTAL (Success)        1.5-2.5s     100%          Typical response time
+  TOTAL (1 Retry)        2.5-4.5s     -             If JSON invalid
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        UNREAL ENGINE INTEGRATION                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  HTTP REST API (Recommended)                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Python Backend (Flask Server)                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  POST http://localhost:5000/api/command                             │   │
+│  │  Request:  {"text": "follow me", "companion_id": "companion_01"}    │   │
+│  │  Response: {"success": true, "dialogue": "...", ...}                │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Unreal Engine (C++ HTTP Client)                                            │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  FAICompanionClient::SendCommand(TextCommand, OnResponse)           │   │
+│  │  • Async HTTP request                                               │   │
+│  │  • Timeout: 5-10 seconds                                            │   │
+│  │  • Callback: OnAIResponse(bSuccess, Dialogue)                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          OPTIMIZATION STRATEGIES                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Strategy                Impact              Implementation Complexity
+  ──────────────────────  ──────────────────  ─────────────────────────
+  Response Caching        90% time reduction  Low (dictionary cache)
+  Gemini Streaming API    50% perceived lag   Medium (async handling)
+  Local LLM               75% time reduction  High (model deployment)
+  Command Prediction      95% time reduction  High (ML prediction)
+  Request Batching        30% throughput ↑    Medium (queue system)
+
+```

@@ -1,0 +1,81 @@
+{
+	"info": {
+		"_postman_id": "b96a4049-563b-4654-9467-172551000000",
+		"name": "AI Companion API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "ngrok-skip-browser-warning",
+						"value": "true",
+						"type": "text"
+					},
+					{
+						"key": "User-Agent",
+						"value": "MyCustomApp/1.0",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://corey-semimagnetical-lenny.ngrok-free.dev/health",
+					"protocol": "https",
+					"host": [
+						"corey-semimagnetical-lenny",
+						"ngrok-free",
+						"dev"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Send Command",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "ngrok-skip-browser-warning",
+						"value": "true",
+						"type": "text"
+					},
+					{
+						"key": "User-Agent",
+						"value": "MyCustomApp/1.0",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"text\": \"follow me\",\n  \"companion_id\": \"01\"\n}"
+				},
+				"url": {
+					"raw": "https://corey-semimagnetical-lenny.ngrok-free.dev/api/command",
+					"protocol": "https",
+					"host": [
+						"corey-semimagnetical-lenny",
+						"ngrok-free",
+						"dev"
+					],
+					"path": [
+						"api",
+						"command"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
