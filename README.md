@@ -83,13 +83,16 @@ We have included a **Postman Collection** to make testing easy.
 
 ```
 UE_testing/
+├── app/                       # Core Application Logic
+│   ├── intent_compiler.py     # AI Logic (Text -> JSON)
+│   ├── mock_unreal.py         # Fake UE for testing
+│   └── ...
 ├── docs/                      # Documentation & Tutorials
 ├── postman/                   # API Collections
-├── config.py                  # LLM Prompts & Config
-├── intent_compiler.py         # AI Logic (Text -> JSON)
-├── mock_unreal.py             # Fake UE for testing
-├── server.py                  # Flask API Server
-├── run.py                     # CLI Runner
+├── tests/                     # Test Suite
+├── tools/                     # Utilities (ngrok)
+├── server.py                  # Flask API Server (Entry Point)
+├── run.py                     # CLI Runner (Entry Point)
 ├── QUICKSTART_GUIDE.md        # Daily Instructions
 └── README.md                  # This file
 ```

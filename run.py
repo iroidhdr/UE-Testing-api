@@ -16,11 +16,11 @@ Usage:
 import sys
 import logging
 from typing import Optional
-from intent_compiler import compile_intent
-from mock_unreal import get_unreal_engine
-from dialogue_resolver import resolve_dialogue
-from schema import pretty_print_json
-from config import LOG_LEVEL, LOG_FORMAT
+from app.intent_compiler import compile_intent
+from app.mock_unreal import get_unreal_engine
+from app.dialogue_resolver import resolve_dialogue
+from app.schema import pretty_print_json
+from app.config import LOG_LEVEL, LOG_FORMAT
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)

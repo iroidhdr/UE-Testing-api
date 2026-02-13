@@ -7,10 +7,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 import time
-from intent_compiler import compile_intent
-from mock_unreal import get_unreal_engine
-from dialogue_resolver import resolve_dialogue
-from schema import pretty_print_json
+from app.intent_compiler import compile_intent
+from app.mock_unreal import get_unreal_engine
+from app.dialogue_resolver import resolve_dialogue
+from app.schema import pretty_print_json
 
 # Configure logging
 logging.basicConfig(

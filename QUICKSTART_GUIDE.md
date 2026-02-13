@@ -43,7 +43,7 @@ _(Wait until you see "Server starting on http://0.0.0.0:5000")_
 cd Path/To/UE_testing
 
 # 2. Start Tunnel (Free Version)
-ngrok http 5000
+tools/ngrok http 5000
 ```
 
 ---

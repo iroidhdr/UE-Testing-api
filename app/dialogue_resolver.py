@@ -8,7 +8,7 @@ The mapping is deterministic and defined in config.py.
 
 import logging
 from typing import Dict, Any, List
-from config import DIALOGUE_MAP
+from .config import DIALOGUE_MAP
 
 # Configure logging
 logger = logging.getLogger(__name__)

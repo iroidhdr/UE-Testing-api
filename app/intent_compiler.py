@@ -18,8 +18,8 @@ from openai import OpenAI
 import json
 import logging
 from typing import Dict, Any, Optional
-from schema import validate_command, pretty_print_json
-from config import (
+from .schema import validate_command, pretty_print_json
+from .config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
     LLM_TEMPERATURE,

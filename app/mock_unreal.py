@@ -12,8 +12,8 @@ The LLM has NO say in feasibility - only UE decides.
 
 import logging
 from typing import Dict, Any
-from schema import validate_response, pretty_print_json
-from config import DEFAULT_COMPANION_ID
+from .schema import validate_response, pretty_print_json
+from .config import DEFAULT_COMPANION_ID
 
 # Configure logging
 logger = logging.getLogger(__name__)
