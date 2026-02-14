@@ -30,7 +30,7 @@ COMMAND_SCHEMA = {
             "minItems": 1,
             "items": {
                 "type": "object",
-                "required": ["action_id", "type", "target", "parameters", "assigned_to", "priority"],
+                "required": ["action_id", "type", "assigned_to", "priority"],
                 "properties": {
                     "action_id": {
                         "type": "string",
@@ -38,7 +38,14 @@ COMMAND_SCHEMA = {
                     },
                     "type": {
                         "type": "string",
-                        "enum": ["follow", "stop_follow", "wait", "attack", "defend", "assist", "unknown"],
+                        "enum": [
+                            "follow", "stop_follow", "wait", "hold_position",
+                            "move_to", "take_cover", "engage", "attack", 
+                            "suppress", "overwatch", "clear_area", 
+                            "pick_up", "interact", "use_item_on", 
+                            "throw_equipment", "retreat", "regroup", 
+                            "cancel", "defend", "assist", "unknown"
+                        ],
                         "description": "Action type - closed vocabulary of supported commands"
                     },
                     "target": {
@@ -51,7 +58,7 @@ COMMAND_SCHEMA = {
                                 "description": "List of target descriptors (e.g., ['player'])"
                             },
                             "category_hint": {
-                                "type": "string",
+                                "type": ["string", "null"],
                                 "description": "Category hint for target (e.g., 'player')"
                             }
                         }

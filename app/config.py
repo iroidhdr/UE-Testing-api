@@ -54,7 +54,7 @@ SUPPORTED ACTIONS (closed vocabulary):
 - cancel            → Cancel current task
 
 COMMON PARAMETERS:
-- spatial_direction: "Front", "Left", "Right", "Back" (Use if direction is implied)
+- spatial_direction: "Front", "Left", "Right", "Back" (REQUIRED if direction is mentioned)
 - priority: "low", "normal", "high", "critical"
 
 COMMAND STRUCTURE:
@@ -62,17 +62,16 @@ COMMAND STRUCTURE:
   "command_id": "cmd_001",
   "actions": [{
     "action_id": "act_001",
-    "type": "engage",
-    "target": {"descriptors": ["enemy", "sniper"], "category_hint": "enemy"},
+    "type": "move_to",
+    "target": {"descriptors": ["left"], "category_hint": "location"},
     "parameters": {
-        "fire_mode": "auto",
-        "spatial_direction": "Front" 
+        "spatial_direction": "Left" 
     },
     "assigned_to": "companion_01",
-    "priority": "high",
+    "priority": "normal",
     "depends_on": null
   }],
-  "dialogue_context": "kill that sniper",
+  "dialogue_context": "move left",
   "requires_clarification": false
 }
 """

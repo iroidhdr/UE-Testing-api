@@ -15,7 +15,11 @@ from app.schema import pretty_print_json
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("server.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -123,6 +127,7 @@ def process_command():
             'response_id': action_result['response_id'],
             'command_id': response['command_id'],
             'action_type_executed': action_result['action_type_executed'],
+            'spatial_direction': action_result.get('spatial_direction'),
             'action_status': action_result['status'],
             'action_reason': action_result.get('reason'),
             'processing_time_ms': int(total_time),
@@ -141,7 +146,7 @@ def process_command():
         INPUT: "{text_input}"
         --------------------------------------------------
         LLM OUTPUT:
-        {command['actions'][0]['type']} (Target: {command['actions'][0]['target'].get('category_hint')})
+        {command['actions'][0]['type']} (Target: {command['actions'][0].get('target', {}).get('category_hint')})
         --------------------------------------------------
         UE EXECUTION:
         Action Type: {action_result['action_type_executed']}
