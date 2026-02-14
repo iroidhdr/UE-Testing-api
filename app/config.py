@@ -84,7 +84,7 @@ COMMAND STRUCTURE:
 DIALOGUE_MAP = {
     # Movement
     "RESP_FOLLOW_ACCEPT": "Right behind you.",
-    "RESP_ALREADY_FOLLOWING": "I'm already following you.",
+    "RESP_ALREADY_FOLLOWING": "Roger that. Following.",
     "RESP_STOP_ACCEPT": "Stopping here.",
     "RESP_NOT_FOLLOWING": "I'm not moving.",
     "RESP_MOVE_ACCEPT": "Moving to position.",
