@@ -120,10 +120,13 @@ def process_command():
     dialogues = resolve_dialogue(response)
 
     return jsonify({
-        'success': True,
+        'success': response['actions'][0]['status'],
         'dialogue': dialogues[0],
         'response_id': response['actions'][0]['response_id'],
-        'command_id': response['command_id']
+        'command_id': response['command_id'],
+        'action_type_executed': response['actions'][0]['action_type_executed'],
+        'action_status': response['actions'][0]['status'],
+        'action_reason': response['actions'][0].get('reason')
     })
 
 if __name__ == '__main__':
@@ -246,7 +249,11 @@ void FAICompanionClient::OnResponseReceived(
         bool bSuccess = JsonObject->GetBoolField(TEXT("success"));
         FString Dialogue = JsonObject->GetStringField(TEXT("dialogue"));
 
-        UE_LOG(LogTemp, Log, TEXT("AI Response: %s"), *Dialogue);
+        // Get Action Status
+        FString ActionType = JsonObject->GetStringField(TEXT("action_type_executed"));
+        bool bActionStatus = JsonObject->GetBoolField(TEXT("action_status"));
+
+        UE_LOG(LogTemp, Log, TEXT("AI Response: %s (Action: %s, Success: %d)"), *Dialogue, *ActionType, bActionStatus);
         Callback.ExecuteIfBound(bSuccess, Dialogue);
     }
     else

@@ -68,14 +68,12 @@ We have included a **Postman Collection** to make testing easy.
 
 ## 🎮 Supported Commands
 
-| Command    | Example                         |
-| :--------- | :------------------------------ |
-| **Follow** | "follow me", "come here"        |
-| **Stop**   | "stop following", "stay there"  |
-| **Wait**   | "wait here"                     |
-| **Attack** | "attack that enemy", "kill him" |
-| **Defend** | "defend this point"             |
-| **Assist** | "help me", "cover me"           |
+| Command Category | Examples                                                                                            |
+| :--------------- | :-------------------------------------------------------------------------------------------------- |
+| **Movement**     | "follow me", "move to the door", "hold position", "take cover", "retreat", "regroup"                |
+| **Combat**       | "attack that enemy", "suppress the window", "clear this room", "defend here", "overwatch this area" |
+| **Interaction**  | "pick up the ammo", "use the switch", "throw a grenade", "use medkit on me"                         |
+| **General**      | "stop", "cancel", "wait here"                                                                       |
 
 ---
 

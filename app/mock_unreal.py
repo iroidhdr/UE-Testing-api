@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class MockUnrealEngine:
     """
     Mock Unreal Engine executor.
-    Maintains simple state and validates commands.
+    Maintains simple state and validates commands using a strict Dispatcher Pattern.
     """
     
     def __init__(self):
@@ -34,7 +34,8 @@ class MockUnrealEngine:
                 "is_waiting": False,
                 "is_defending": False,
                 "following_target": None,
-                "current_target": None
+                "current_target": None,
+                "location": "default_spawn"
             }
         }
         logger.info("Mock Unreal Engine initialized")
@@ -43,13 +44,11 @@ class MockUnrealEngine:
         """
         Execute a command and return the result.
         
-        This is where ALL game logic lives. The LLM has no say here.
-        
         Args:
             command: Validated command JSON from LLM
             
         Returns:
-            Response JSON with status and response_id
+            Response JSON with status, action_type_executed, and response_id
         """
         command_id = command["command_id"]
         actions = command["actions"]
@@ -82,320 +81,176 @@ class MockUnrealEngine:
     
     def _execute_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute a single action.
-        
-        Args:
-            action: Action dictionary from command
-            
-        Returns:
-            Action result dictionary
+        Dispatcher for actions.
+         Strictly maps action['type'] to a handler function.
         """
-        action_id = action["action_id"]
         action_type = action["type"]
-        assigned_to = action["assigned_to"]
         
-        logger.debug(f"Executing action {action_id} (type: {action_type})")
+        # Dispatch Table
+        dispatch_table = {
+            "follow": self._execute_follow,
+            "stop_follow": self._execute_stop_follow,
+            "wait": self._execute_wait,
+            "attack": self._execute_engage,      # Legacy support
+            "engage": self._execute_engage,
+            "defend": self._execute_defend,
+            "assist": self._execute_assist,
+            "move_to": self._execute_move_to,
+            "hold_position": self._execute_hold_position,
+            "take_cover": self._execute_take_cover,
+            "suppress": self._execute_suppress,
+            "overwatch": self._execute_overwatch,
+            "clear_area": self._execute_clear_area,
+            "pick_up": self._execute_pick_up,
+            "interact": self._execute_interact,
+            "use_item_on": self._execute_use_item_on,
+            "throw_equipment": self._execute_throw_equipment,
+            "retreat": self._execute_retreat,
+            "regroup": self._execute_regroup,
+            "cancel": self._execute_cancel,
+            "unknown": self._execute_unknown
+        }
         
-        # Command routing: dispatch to appropriate handler
-        if action_type == "follow":
-            return self._execute_follow(action_id, assigned_to, action["target"])
-        elif action_type == "stop_follow":
-            return self._execute_stop_follow(action_id, assigned_to)
-        elif action_type == "wait":
-            return self._execute_wait(action_id, assigned_to)
-        elif action_type == "attack":
-            return self._execute_attack(action_id, assigned_to, action["target"])
-        elif action_type == "defend":
-            return self._execute_defend(action_id, assigned_to)
-        elif action_type == "assist":
-            return self._execute_assist(action_id, assigned_to)
-        elif action_type == "unknown":
-            return self._execute_unknown(action_id, assigned_to)
-        else:
-            # Fallback for truly unknown types (shouldn't happen)
-            logger.error(f"Unhandled action type: {action_type}")
+        if action_type not in dispatch_table:
             return {
-                "action_id": action_id,
+                "action_id": action["action_id"],
+                "action_type_executed": "unknown",
                 "status": False,
-                "reason": f"Unhandled action type: {action_type}",
-                "companion_id": assigned_to,
-                "response_id": "RESP_UNKNOWN_COMMAND"
+                "reason": "unsupported_action",
+                "companion_id": action.get("assigned_to", "unknown"),
+                "spatial_direction": None,
+                "response_id": "RESP_UNSUPPORTED_ACTION"
             }
-    
-    def _execute_follow(self, action_id: str, companion_id: str, target: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute a 'follow' action.
-        
-        Game Logic:
-        - If companion is already following → FAIL (RESP_ALREADY_FOLLOWING)
-        - Otherwise → SUCCESS (RESP_FOLLOW_ACCEPT)
-        
-        Args:
-            action_id: Action identifier
-            companion_id: Companion to execute action
-            target: Target information
             
-        Returns:
-            Action result dictionary
-        """
-        # Get companion state
-        if companion_id not in self.companion_state:
-            # Unknown companion
-            logger.warning(f"Unknown companion: {companion_id}")
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_CANNOT_FOLLOW"
-            }
+        handler = dispatch_table[action_type]
+        return handler(action)
+
+    # =========================================================================
+    # Action Handlers
+    # =========================================================================
+
+    def _execute_follow(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        companion_id = action.get("assigned_to", DEFAULT_COMPANION_ID)
+        state = self.companion_state.get(companion_id, {})
         
-        state = self.companion_state[companion_id]
+        if state.get("is_following"):
+            return self._build_result(action, "follow", False, "already_following", "RESP_ALREADY_FOLLOWING")
         
-        # Check if already following
-        if state["is_following"]:
-            logger.info(f"Companion {companion_id} is already following")
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Already following",
-                "companion_id": companion_id,
-                "response_id": "RESP_ALREADY_FOLLOWING"
-            }
-        
-        # Execute follow action
-        target_category = target.get("category_hint", "unknown")
-        logger.info(f"Companion {companion_id} now following {target_category}")
-        
-        # Update state
         state["is_following"] = True
-        state["following_target"] = target_category
+        return self._build_result(action, "follow", True, None, "RESP_FOLLOW_ACCEPT")
+
+    def _execute_stop_follow(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        companion_id = action.get("assigned_to", DEFAULT_COMPANION_ID)
+        state = self.companion_state.get(companion_id, {})
         
-        return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_FOLLOW_ACCEPT"
-        }
-    
-    def _execute_stop_follow(self, action_id: str, companion_id: str) -> Dict[str, Any]:
-        """
-        Execute a 'stop_follow' action.
+        if not state.get("is_following"):
+            return self._build_result(action, "stop_follow", False, "not_following", "RESP_NOT_FOLLOWING")
         
-        Game Logic:
-        - If companion is not following → FAIL (RESP_NOT_FOLLOWING)
-        - Otherwise → SUCCESS (RESP_STOP_ACCEPT)
-        """
-        if companion_id not in self.companion_state:
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_UNKNOWN_COMMAND"
-            }
-        
-        state = self.companion_state[companion_id]
-        
-        if not state["is_following"]:
-            logger.info(f"Companion {companion_id} is not following")
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Not following",
-                "companion_id": companion_id,
-                "response_id": "RESP_NOT_FOLLOWING"
-            }
-        
-        # Stop following
-        logger.info(f"Companion {companion_id} stopped following")
         state["is_following"] = False
-        state["following_target"] = None
+        return self._build_result(action, "stop_follow", True, None, "RESP_STOP_ACCEPT")
+
+    def _execute_wait(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        # Alias for Hold Position
+        return self._execute_hold_position(action)
+
+    def _execute_hold_position(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        companion_id = action.get("assigned_to", DEFAULT_COMPANION_ID)
+        state = self.companion_state.get(companion_id, {})
         
-        return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_STOP_ACCEPT"
-        }
-    
-    def _execute_wait(self, action_id: str, companion_id: str) -> Dict[str, Any]:
-        """
-        Execute a 'wait' action.
-        
-        Game Logic:
-        - Companion enters waiting state
-        - Always succeeds
-        """
-        if companion_id not in self.companion_state:
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_UNKNOWN_COMMAND"
-            }
-        
-        state = self.companion_state[companion_id]
-        
-        # Enter waiting state
-        logger.info(f"Companion {companion_id} is now waiting")
+        state["is_following"] = False
         state["is_waiting"] = True
-        state["is_following"] = False  # Can't wait and follow
-        state["following_target"] = None
-        
-        return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_WAIT_ACCEPT"
-        }
-    
-    def _execute_attack(self, action_id: str, companion_id: str, target: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute an 'attack' action.
-        
-        Game Logic:
-        - Check if target exists (simplified: check if descriptors provided)
-        - If no target → FAIL (RESP_NO_TARGET)
-        - Otherwise → SUCCESS (RESP_ATTACK_ACCEPT)
-        """
-        if companion_id not in self.companion_state:
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_UNKNOWN_COMMAND"
-            }
-        
-        state = self.companion_state[companion_id]
-        
-        # Check if target is specified
+        return self._build_result(action, "hold_position", True, None, "RESP_HOLD_ACCEPT")
+
+    def _execute_engage(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        target = action.get("target", {})
         descriptors = target.get("descriptors", [])
-        if not descriptors or descriptors == []:
-            logger.info(f"Companion {companion_id} has no attack target")
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "No target specified",
-                "companion_id": companion_id,
-                "response_id": "RESP_NO_TARGET"
-            }
         
-        # Execute attack
-        target_desc = ", ".join(descriptors)
-        logger.info(f"Companion {companion_id} attacking {target_desc}")
-        state["current_target"] = target_desc
-        state["is_waiting"] = False
-        
-        return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_ATTACK_ACCEPT"
-        }
-    
-    def _execute_defend(self, action_id: str, companion_id: str) -> Dict[str, Any]:
-        """
-        Execute a 'defend' action.
-        
-        Game Logic:
-        - Companion enters defensive mode
-        - Always succeeds
-        """
-        if companion_id not in self.companion_state:
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_UNKNOWN_COMMAND"
-            }
-        
-        state = self.companion_state[companion_id]
-        
-        # Enter defensive mode
-        logger.info(f"Companion {companion_id} is now defending")
-        state["is_defending"] = True
-        state["is_waiting"] = False
-        
-        return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_DEFEND_ACCEPT"
-        }
-    
-    def _execute_assist(self, action_id: str, companion_id: str) -> Dict[str, Any]:
-        """
-        Execute an 'assist' action.
-        
-        Game Logic:
-        - Companion helps the player
-        - Always succeeds
-        """
-        if companion_id not in self.companion_state:
-            return {
-                "action_id": action_id,
-                "status": False,
-                "reason": "Unknown companion",
-                "companion_id": companion_id,
-                "response_id": "RESP_UNKNOWN_COMMAND"
-            }
-        
-        logger.info(f"Companion {companion_id} is assisting")
+        if not descriptors:
+            return self._build_result(action, "engage", False, "no_target", "RESP_NO_TARGET")
+            
+        return self._build_result(action, "engage", True, None, "RESP_ENGAGE_ACCEPT")
+
+    def _execute_defend(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "defend", True, None, "RESP_DEFEND_ACCEPT")
+
+    def _execute_assist(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "assist", True, None, "RESP_ASSIST_ACCEPT")
+
+    def _execute_move_to(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "move_to", True, None, "RESP_MOVE_ACCEPT")
+
+    def _execute_take_cover(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "take_cover", True, None, "RESP_COVER_ACCEPT")
+
+    def _execute_suppress(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "suppress", True, None, "RESP_SUPPRESS_ACCEPT")
+
+    def _execute_overwatch(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "overwatch", True, None, "RESP_OVERWATCH_ACCEPT")
+
+    def _execute_clear_area(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "clear_area", True, None, "RESP_CLEAR_ACCEPT")
+
+    def _execute_pick_up(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "pick_up", True, None, "RESP_PICKUP_ACCEPT")
+
+    def _execute_interact(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "interact", True, None, "RESP_INTERACT_ACCEPT")
+
+    def _execute_use_item_on(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "use_item_on", True, None, "RESP_USE_ITEM_ACCEPT")
+
+    def _execute_throw_equipment(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "throw_equipment", True, None, "RESP_THROW_ACCEPT")
+
+    def _execute_retreat(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "retreat", True, None, "RESP_RETREAT_ACCEPT")
+
+    def _execute_regroup(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "regroup", True, None, "RESP_REGROUP_ACCEPT")
+
+    def _execute_cancel(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "cancel", True, None, "RESP_CANCEL_ACCEPT")
+
+    def _execute_unknown(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self._build_result(action, "unknown", False, "unknown_command", "RESP_UNKNOWN_COMMAND")
+
+    def _build_result(self, action, executed_type, status, reason, response_id):
+        """Helper to build standardized response."""
+        # Extract direction if present in parameters
+        params = action.get("parameters", {})
+        direction = params.get("spatial_direction")
         
         return {
-            "action_id": action_id,
-            "status": True,
-            "reason": None,
-            "companion_id": companion_id,
-            "response_id": "RESP_ASSIST_ACCEPT"
+            "action_id": action["action_id"],
+            "action_type_executed": executed_type,
+            "spatial_direction": direction,
+            "status": status,
+            "reason": reason,
+            "companion_id": action.get("assigned_to", DEFAULT_COMPANION_ID),
+            "response_id": response_id
         }
-    
-    def _execute_unknown(self, action_id: str, companion_id: str) -> Dict[str, Any]:
-        """
-        Execute an 'unknown' action.
-        
-        Game Logic:
-        - LLM classified intent as unknown/unsupported
-        - Always fails with RESP_UNKNOWN_COMMAND
-        """
-        logger.info(f"Unknown command for companion {companion_id}")
-        
-        return {
-            "action_id": action_id,
-            "status": False,
-            "reason": "Unknown or unsupported command",
-            "companion_id": companion_id,
-            "response_id": "RESP_UNKNOWN_COMMAND"
-        }
-    
+
     def reset(self):
         """Reset the UE state (for testing)."""
         logger.info("Resetting Mock Unreal Engine state")
         for companion_id in self.companion_state:
-            self.companion_state[companion_id]["is_following"] = False
-            self.companion_state[companion_id]["is_waiting"] = False
-            self.companion_state[companion_id]["is_defending"] = False
-            self.companion_state[companion_id]["following_target"] = None
-            self.companion_state[companion_id]["current_target"] = None
+            self.companion_state[companion_id] = {
+                "is_following": False,
+                "is_waiting": False,
+                "is_defending": False,
+                "following_target": None,
+                "current_target": None
+            }
 
 
 # ============================================================================
-# Singleton instance for convenience
+# Singleton instance
 # ============================================================================
 
 _ue_instance = None
 
 def get_unreal_engine() -> MockUnrealEngine:
-    """Get the singleton Mock UE instance."""
     global _ue_instance
     if _ue_instance is None:
         _ue_instance = MockUnrealEngine()

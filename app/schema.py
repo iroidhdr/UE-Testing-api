@@ -58,7 +58,14 @@ COMMAND_SCHEMA = {
                     },
                     "parameters": {
                         "type": "object",
-                        "description": "Action-specific parameters (optional, varies by action type)"
+                        "description": "Action-specific parameters",
+                        "properties": {
+                            "spatial_direction": {
+                                "type": "string",
+                                "enum": ["Front", "Left", "Right", "Back"],
+                                "description": "Direction relative to the companion (Front, Left, Right, Back)"
+                            }
+                        }
                     },
                     "assigned_to": {
                         "type": "string",
@@ -110,11 +117,20 @@ RESPONSE_SCHEMA = {
             "minItems": 1,
             "items": {
                 "type": "object",
-                "required": ["action_id", "status", "companion_id", "response_id"],
+                "required": ["action_id", "action_type_executed", "status", "reason", "companion_id", "response_id"],
                 "properties": {
                     "action_id": {
                         "type": "string",
                         "description": "Action ID this result corresponds to"
+                    },
+                    "action_type_executed": {
+                        "type": "string",
+                        "description": "The actual action type that was executed (or attempted)"
+                    },
+                    "spatial_direction": {
+                        "type": ["string", "null"],
+                        "enum": ["Front", "Left", "Right", "Back", None],
+                        "description": "Direction of the action if applicable (Front, Left, Right, Back)"
                     },
                     "status": {
                         "type": "boolean",
@@ -122,7 +138,7 @@ RESPONSE_SCHEMA = {
                     },
                     "reason": {
                         "type": ["string", "null"],
-                        "description": "Reason for failure (null if succeeded)"
+                        "description": "Reason for failure (null or empty string if succeeded)"
                     },
                     "companion_id": {
                         "type": "string",

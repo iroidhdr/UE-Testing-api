@@ -115,14 +115,16 @@ def process_command():
         # Calculate total time
         total_time = (time.time() - start_time) * 1000
         
-        # Build response
+        # Build strict response
         action_result = response['actions'][0]
         result = {
-            'success': True,
+            'success': action_result['status'],
             'dialogue': dialogues[0],
             'response_id': action_result['response_id'],
             'command_id': response['command_id'],
+            'action_type_executed': action_result['action_type_executed'],
             'action_status': action_result['status'],
+            'action_reason': action_result.get('reason'),
             'processing_time_ms': int(total_time),
             'timing_breakdown': {
                 'llm_ms': int(compile_time),
@@ -131,8 +133,26 @@ def process_command():
             }
         }
         
-        logger.info(f"Command processed successfully in {total_time:.0f}ms")
-        logger.info(f"Response: {action_result['response_id']} - '{dialogues[0]}'")
+        # 5️⃣ Add Structured Logging (Farcana Requirement)
+        log_msg = f"""
+        \n==================================================
+        UE EXECUTION REPORT
+        ==================================================
+        INPUT: "{text_input}"
+        --------------------------------------------------
+        LLM OUTPUT:
+        {command['actions'][0]['type']} (Target: {command['actions'][0]['target'].get('category_hint')})
+        --------------------------------------------------
+        UE EXECUTION:
+        Action Type: {action_result['action_type_executed']}
+        Status: {action_result['status']}
+        Reason: {action_result['reason']}
+        Response ID: {action_result['response_id']}
+        --------------------------------------------------
+        DIALOGUE:
+        "{dialogues[0]}"
+        ==================================================\n"""
+        logger.info(log_msg)
         
         return jsonify(result)
         

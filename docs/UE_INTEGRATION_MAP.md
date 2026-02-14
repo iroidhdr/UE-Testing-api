@@ -10,19 +10,18 @@ This guide explains how to connect your Unreal Engine game to the AI Companion A
 
 ---
 
-## 🗺️ Action Mapping Table
+## 🗺️ Action Mapping Table (5.2 Update)
 
 Map the API `type` (string) to your UE Enum (`EActionType`).
 
-| API JSON `type` | UE Enum (`EActionType`)           | Description                  |
-| --------------- | --------------------------------- | ---------------------------- |
-| `"follow"`      | **`Follow`**                      | Character follows the player |
-| `"stop_follow"` | **`HoldPosition`** (or `None`)    | Character stops moving       |
-| `"wait"`        | **`HoldPosition`**                | Character holds ground       |
-| `"attack"`      | **`Engage`**                      | Character attacks target     |
-| `"defend"`      | **`TakeCover`** / **`Overwatch`** | Character defends area       |
-| `"assist"`      | **`Regroup`** (or `Follow`)       | Character assists player     |
-| `"unknown"`     | **`None`**                        | Action ignored               |
+| **Interaction** | | |
+| `"interact"` | `Interact` | Use object (door/switch) |
+| `"pick_up"` | `PickUp` | Pick up item |
+| `"use_item_on"` | `UseItem` | Use inventory item |
+| `"throw_equipment"` | `Throw` | Throw grenade/utility |
+| **Other** | | |
+| `"cancel"` | `Cancel` | Stop current action |
+| `"unknown"` | `None` | Action ignored |
 
 ---
 
@@ -33,27 +32,22 @@ This is the easiest way to test without writing C++.
 ### 1. Send Request
 
 1. Add **"Construct Json Object"**.
-2. Set String Field: `text` = "follow me".
-3. Set String Field: `companion_id` = "companion_01".
-4. Call **"Call URL"** on the Json Object.
+2. Set String Field: `text` = "suppress that area".
+3. Call **"Call URL"** on the Json Object.
    - **Method**: `POST`
    - **URL**: `http://localhost:5000/api/command`
    - **Content Type**: `application/json`
 
 ### 2. Handle Response
 
-1. On the **"Completed"** pin of `Call URL`:
-2. Get the **Response Object**.
-3. Call **"Get Array Field"** with field name `actions`.
-4. Call **"As Object"** on the first element (index 0).
-5. Call **"Get String Field"** with field name `type`.
-
-### 3. Switch & Execute
-
-1. Add a **"Switch on String"** node.
-2. Add pins: `follow`, `attack`, `wait`, etc.
-3. Connect the `type` string to the Switch.
-4. From each pin, call your Character's function (e.g., `SetCurrentState(EActionType::Follow)`).
+1. On **"Completed"**:
+2. Get **Response Object**.
+3. Call **"Get Array Field"** (`actions`).
+4. Get Element 0 **(As Object)**.
+5. **CRITICAL:** Check `status` (Boolean).
+   - **True**: Action Succeeded.
+   - **False**: Action Failed (Check `reason` string).
+6. Switch on `action_type_executed` to trigger game logic.
 
 ---
 
@@ -61,15 +55,7 @@ This is the easiest way to test without writing C++.
 
 For production, you should use C++.
 
-### 1. Add Modules
-
-In `YourProject.Build.cs`:
-
-```csharp
-PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HTTP", "Json", "JsonUtilities" });
-```
-
-### 2. Define Structs
+### 1. Define Structs
 
 In a header file (`AICommandTypes.h`):
 
@@ -84,10 +70,19 @@ struct FAIAction
     GENERATED_BODY()
 
     UPROPERTY()
-    FString type; // "follow", "attack", etc.
+    FString action_type_executed; // "follow", "suppress", etc.
 
     UPROPERTY()
-    FString action_id;
+    FString spatial_direction; // "Front", "Left", "Right", "Back"
+
+    UPROPERTY()
+    bool status; // true/false
+
+    UPROPERTY()
+    FString reason; // e.g. "already_following"
+
+    UPROPERTY()
+    FString response_id; // "RESP_FOLLOW_ACCEPT"
 };
 
 USTRUCT()
@@ -99,44 +94,18 @@ struct FAICommandResponse
     bool success;
 
     UPROPERTY()
+    FString dialogue;
+
+    UPROPERTY()
     TArray<FAIAction> actions;
 };
 ```
 
-### 3. Send Request Function
+### 2. Parse Response
 
-In your generic AI Controller or Game Instance:
+In your `OnCommandResponse` function:
 
 ```cpp
-#include "HttpModule.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
-#include "JsonObjectConverter.h"
-
-void AMyAIController::SendCommand(FString CommandText)
-{
-    // Create Request
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetURL("http://localhost:5000/api/command");
-    Request->SetVerb("POST");
-    Request->SetHeader("Content-Type", "application/json");
-    Request->SetHeader("User-Agent", "MyCustomApp/1.0"); // Critical: Add Header to bypass ngrok/firewall blocks.
-
-    // Create JSON Body
-    FString JsonString;
-    TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-    JsonObject->SetStringField("text", CommandText);
-    JsonObject->SetStringField("companion_id", "companion_01");
-    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonString);
-    FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
-
-    Request->SetContentAsString(JsonString);
-
-    // Bind Callback
-    Request->OnProcessRequestComplete().BindUObject(this, &AMyAIController::OnCommandResponse);
-    Request->ProcessRequest();
-}
-
 void AMyAIController::OnCommandResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
     if (!bWasSuccessful || !Response.IsValid()) return;
@@ -145,16 +114,25 @@ void AMyAIController::OnCommandResponse(FHttpRequestPtr Request, FHttpResponsePt
     FAICommandResponse ApiResponse;
     if (FJsonObjectConverter::JsonObjectStringToUStruct(Response->GetContentAsString(), &ApiResponse))
     {
+        // 1. Show Dialogue
+        ShowDialogue(ApiResponse.dialogue);
+
+        // 2. Execute Action (if valid)
         if (ApiResponse.actions.Num() > 0)
         {
-            FString ActionType = ApiResponse.actions[0].type;
+            FAIAction& Action = ApiResponse.actions[0];
 
-            // Map to Enum
-            if (ActionType == "follow") SetState(EActionType::Follow);
-            else if (ActionType == "attack") SetState(EActionType::Engage);
-            else if (ActionType == "wait") SetState(EActionType::HoldPosition);
-
-            UE_LOG(LogTemp, Log, TEXT("AI Action: %s"), *ActionType);
+            if (Action.status)
+            {
+                // Execute Game Logic
+                if (Action.action_type_executed == "suppress") SuppressArea();
+                else if (Action.action_type_executed == "follow") StartFollowing();
+            }
+            else
+            {
+                // Handle Failure (Optional)
+                UE_LOG(LogTemp, Warning, TEXT("Action Failed: %s"), *Action.reason);
+            }
         }
     }
 }
@@ -167,11 +145,13 @@ void AMyAIController::OnCommandResponse(FHttpRequestPtr Request, FHttpResponsePt
 ```json
 {
   "success": true,
-  "actions": [
-    {
-      "type": "attack",
-      "target": { "descriptors": ["enemy"] }
-    }
-  ]
+  "dialogue": "Laying down suppressing fire!",
+  "response_id": "RESP_SUPPRESS_ACCEPT",
+  "command_id": "cmd_001",
+  "action_type_executed": "suppress",
+  "spatial_direction": "Front",
+  "action_status": true,
+  "action_reason": null,
+  "processing_time_ms": 1250
 }
 ```

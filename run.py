@@ -72,11 +72,12 @@ def run_pipeline(text_input: str) -> bool:
         return False
     
     # Extract response_id for display
-    response_ids = [action["response_id"] for action in response["actions"]]
-    print(f"\n📤 UE RESPONSE: {', '.join(response_ids)}")
-    print(f"   Status: {response['actions'][0]['status']}")
-    if response['actions'][0]['reason']:
-        print(f"   Reason: {response['actions'][0]['reason']}")
+    action_result = response["actions"][0]
+    print(f"✅ EXECUTION SUCCESS")
+    print(f"   Action Type: {action_result.get('action_type_executed', 'UNKNOWN')}")
+    print(f"   Status: {action_result['status']}")
+    print(f"   Reason: {action_result.get('reason')}")
+    print(f"   Response ID: {action_result['response_id']}")
     
     # ========================================================================
     # STAGE 4: Dialogue Resolution

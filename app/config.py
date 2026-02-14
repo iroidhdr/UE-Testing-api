@@ -28,63 +28,53 @@ LLM_MAX_RETRIES = 3  # Max retries for invalid JSON
 # System Prompt for Intent Compiler (LLM #1)
 # ============================================================================
 
-INTENT_COMPILER_SYSTEM_PROMPT = """You are an intent-to-JSON compiler for a game AI companion system.
+INTENT_COMPILER_SYSTEM_PROMPT = """You are an intent-to-JSON compiler for a game AI companion.
 
 Your job:
 - Classify the player's intent into ONE supported action type
 - Output ONLY valid JSON
 - Follow the schema exactly
-- Do NOT explain
-- Do NOT check feasibility
-- Do NOT access game state
-- Do NOT invent new actions
+- Do NOT explain, check feasibility, or access game state
 
 SUPPORTED ACTIONS (closed vocabulary):
-- follow → companion follows the player
-- stop_follow → companion stops following
-- wait → companion waits at current position
-- attack → companion attacks a target
-- defend → companion enters defensive mode
-- assist → companion helps the player
-- unknown → intent cannot be mapped safely
+- move_to           → Move to target (Params: movement_speed, formation, stance)
+- follow            → Follow leader (Params: distance, formation)
+- hold_position     → Stay (Params: stance, face_direction, duration)
+- take_cover        → Move to cover (Params: stance, face_direction)
+- engage            → Attack target (Params: engagement_style, fire_mode)
+- suppress          → Suppressive fire (Params: duration, fire_mode, ammo_conservation)
+- overwatch         → Watch area (Params: engagement_rules, report_events)
+- clear_area        → Clear room (Params: engagement_rules, formation)
+- pick_up           → Pick up loot (Target descriptors identify item)
+- interact          → Use object (Params: interaction [open/close/activate])
+- use_item_on       → Use item on target (Params: item_type)
+- throw_equipment   → Throw grenade/utility (Params: equipment_type)
+- retreat           → Fall back (Params: retreat_direction, movement_speed)
+- regroup           → Return to squad (Params: formation)
+- cancel            → Cancel current task
 
-CLASSIFICATION RULES:
-1. If intent clearly matches one action, select it
-2. If intent is ambiguous or unsupported, use "unknown"
-3. Never output anything except JSON
-4. Never check if action is possible (that's Unreal Engine's job)
+COMMON PARAMETERS:
+- spatial_direction: "Front", "Left", "Right", "Back" (Use if direction is implied)
+- priority: "low", "normal", "high", "critical"
 
 COMMAND STRUCTURE:
 {
   "command_id": "cmd_001",
   "actions": [{
     "action_id": "act_001",
-    "type": "follow",
-    "target": {"descriptors": ["player"], "category_hint": "player"},
-    "parameters": {},
+    "type": "engage",
+    "target": {"descriptors": ["enemy", "sniper"], "category_hint": "enemy"},
+    "parameters": {
+        "fire_mode": "auto",
+        "spatial_direction": "Front" 
+    },
     "assigned_to": "companion_01",
-    "priority": "normal",
+    "priority": "high",
     "depends_on": null
   }],
-  "dialogue_context": "follow me",
+  "dialogue_context": "kill that sniper",
   "requires_clarification": false
 }
-
-EXAMPLES:
-
-Input: "follow me"
-Output: {"command_id": "cmd_001", "actions": [{"action_id": "act_001", "type": "follow", "target": {"descriptors": ["player"], "category_hint": "player"}, "parameters": {"distance_preference_m": 2.0}, "assigned_to": "companion_01", "priority": "normal", "depends_on": null}], "dialogue_context": "follow me", "requires_clarification": false}
-
-Input: "stop following"
-Output: {"command_id": "cmd_001", "actions": [{"action_id": "act_001", "type": "stop_follow", "target": {"descriptors": [], "category_hint": "none"}, "parameters": {}, "assigned_to": "companion_01", "priority": "normal", "depends_on": null}], "dialogue_context": "stop following", "requires_clarification": false}
-
-Input: "attack that enemy"
-Output: {"command_id": "cmd_001", "actions": [{"action_id": "act_001", "type": "attack", "target": {"descriptors": ["enemy"], "category_hint": "enemy"}, "parameters": {}, "assigned_to": "companion_01", "priority": "normal", "depends_on": null}], "dialogue_context": "attack that enemy", "requires_clarification": false}
-
-Input: "do a backflip"
-Output: {"command_id": "cmd_001", "actions": [{"action_id": "act_001", "type": "unknown", "target": {"descriptors": [], "category_hint": "none"}, "parameters": {}, "assigned_to": "companion_01", "priority": "normal", "depends_on": null}], "dialogue_context": "do a backflip", "requires_clarification": false}
-
-REMEMBER: Never explain, never check feasibility, only classify intent.
 """
 
 
@@ -93,29 +83,34 @@ REMEMBER: Never explain, never check feasibility, only classify intent.
 # ============================================================================
 
 DIALOGUE_MAP = {
-    # Follow responses
-    "RESP_FOLLOW_ACCEPT": "Alright, I'm right behind you.",
+    # Movement
+    "RESP_FOLLOW_ACCEPT": "Right behind you.",
     "RESP_ALREADY_FOLLOWING": "I'm already following you.",
+    "RESP_STOP_ACCEPT": "Stopping here.",
+    "RESP_NOT_FOLLOWING": "I'm not moving.",
+    "RESP_MOVE_ACCEPT": "Moving to position.",
+    "RESP_HOLD_ACCEPT": "Holding position.",
+    "RESP_RETREAT_ACCEPT": "Falling back!",
+    "RESP_REGROUP_ACCEPT": "On me, regroup!",
     
-    # Stop follow responses
-    "RESP_STOP_ACCEPT": "Stopping now.",
-    "RESP_NOT_FOLLOWING": "I'm not following you.",
+    # Combat
+    "RESP_ENGAGE_ACCEPT": "Engaging target!",
+    "RESP_NO_TARGET": "I don't see a target.",
+    "RESP_SUPPRESS_ACCEPT": "Laying down suppressing fire!",
+    "RESP_OVERWATCH_ACCEPT": "Eyes on the area.",
+    "RESP_COVER_ACCEPT": "Taking cover.",
+    "RESP_CLEAR_ACCEPT": "Clearing the area.",
     
-    # Wait responses
-    "RESP_WAIT_ACCEPT": "I'll wait here.",
+    # Interaction
+    "RESP_PICKUP_ACCEPT": "Got it.",
+    "RESP_INTERACT_ACCEPT": "Interacting.",
+    "RESP_USE_ITEM_ACCEPT": "Using item.",
+    "RESP_THROW_ACCEPT": "Throwing!",
     
-    # Attack responses
-    "RESP_ATTACK_ACCEPT": "Engaging the target!",
-    "RESP_NO_TARGET": "I don't see any enemies.",
-    
-    # Defend responses
-    "RESP_DEFEND_ACCEPT": "Defending this position.",
-    
-    # Assist responses
-    "RESP_ASSIST_ACCEPT": "I'm helping you.",
-    
-    # Unknown command
-    "RESP_UNKNOWN_COMMAND": "I'm not sure what you want me to do."
+    # General
+    "RESP_CANCEL_ACCEPT": "Cancelled.",
+    "RESP_UNKNOWN_COMMAND": "I didn't understand that command.",
+    "RESP_UNSUPPORTED_ACTION": "I don't know how to do that yet."
 }
 
 

@@ -114,14 +114,15 @@ def main():
     tests = [
         ("Health Check",      lambda: test_health()),
         ("Reset State",       lambda: test_reset()),
-        ("Follow",            lambda: test_command("follow me", "Alright, I'm right behind you.")),
-        ("Follow (duplicate)",lambda: test_command("follow me", "I'm already following you.")),
-        ("Stop Follow",       lambda: test_command("stop following", "Stopping now.")),
-        ("Wait",              lambda: test_command("wait here", "I'll wait here.")),
-        ("Attack",            lambda: test_command("attack that enemy", "Engaging the target!")),
+        ("Follow",            lambda: test_command("follow me", "Right behind you.")),
+        ("Stop Follow",       lambda: test_command("stop following", "Stopping here.")),
+        ("Wait",              lambda: test_command("wait here", "Holding position.")),
+        ("Attack (Engage)",   lambda: test_command("attack that enemy", "Engaging target!")),
         ("Defend",            lambda: test_command("defend this area", "Defending this position.")),
-        ("Assist",            lambda: test_command("help me", "I'm helping you.")),
-        ("Unknown",           lambda: test_command("do a backflip", "I'm not sure what you want me to do.")),
+        ("Suppress",          lambda: test_command("suppress the window", "Laying down suppressing fire!")),
+        ("Clear Area",        lambda: test_command("clear this room", "Clearing the area.")),
+        ("Throw Grenade",     lambda: test_command("throw a grenade", "Throwing!")),
+        ("Unknown",           lambda: test_command("do a barrel roll", "I didn't understand that command.")),
     ]
     
     for name, test_func in tests:
